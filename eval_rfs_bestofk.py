@@ -114,12 +114,13 @@ lp_arr = np.asarray(logprobs_all)[keep]                                 # [B, K]
 sel_lp = per_cand[np.arange(len(keep)), lp_arr.argmax(1)]
 pw = np.linalg.norm(inference[:, :, None] - inference[:, None, :], axis=-1).mean(-1)  # [B,K,K]
 sel_md = per_cand[np.arange(len(keep)), pw.sum(-1).argmin(1)]
+np.savez('eval_bestofk_results.npz', names=np.array([names[i] for i in keep]), rfs=rfs,
+         preds4hz=preds4hz[keep], logprobs=np.asarray(logprobs_all)[keep], per_cand=per_cand)
 print(f'select-by-LOGPROB RFS: {sel_lp.mean():.3f}')
 print(f'select-by-MEDOID  RFS: {sel_md.mean():.3f}')
 print(f'best-of-{K} ORACLE RFS: {per_cand.max(1).mean():.3f}')
 print(f'mean single-sample RFS: {per_cand.mean():.3f}')
 print(f'worst-of-{K}: {per_cand.min(1).mean():.3f}')
-np.savez('eval_rfs_results.npz', names=np.array([names[i] for i in keep]), rfs=rfs, preds4hz=preds4hz[keep])
 print('\n=== MODEL RFS (478 rated frames) ===')
 print(f'RFS mean: {rfs.mean():.3f}   (constant-velocity baseline: 7.027)')
 print(f'min {rfs.min():.1f} | p25 {np.percentile(rfs,25):.1f} | median {np.median(rfs):.1f} | p75 {np.percentile(rfs,75):.1f} | max {rfs.max():.1f}')

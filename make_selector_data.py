@@ -47,7 +47,7 @@ def up4(t10):
     w = np.concatenate([np.zeros((1, 2)), t10], 0)
     return np.stack([np.interp(T4, T2, w[:, d]) for d in range(2)], 1)
 
-rng = np.random.default_rng(0)
+rng = np.random.default_rng(int(os.environ.get('SEL_SEED', '0')))
 idx = rng.permutation(len(ds))[:args.limit]
 tokens, trajs, lps, rewards = [], [], [], []
 with torch.no_grad():
