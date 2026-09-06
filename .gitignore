@@ -20,8 +20,8 @@
 # temp
 temp/*
 # ours: heavy/local artifacts
-runs/
-dataset/
+/runs/
+/dataset/
 lightning_logs/
 *.npz
 *.log

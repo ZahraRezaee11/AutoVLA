@@ -38,3 +38,12 @@ Everything below runs on one RTX 5090 (32 GB), Waymo data only, no CoT annotatio
 4. Eval: `python eval_rfs.py --ckpt <ckpt> --config config/training/waymo-rft-v3.yaml`
 
 Checkpoints and datasets are not in the repo (size); ask me for the weights.
+
+## Pipeline
+
+1. Extract images + build LMDB (`ours_scripts/`), generate samples (`tools/preprocessing/nocot_sample_generation.py` with `config/dataset/waymo-*-ours.yaml`)
+2. SFT: `python tools/run_sft_lora.py --config training/waymo-sft-train`
+3. RL: `python tools/run_rft_waymo.py --config training/waymo-rft-v3`
+4. Eval: `python eval_rfs.py --ckpt <ckpt> --config config/training/waymo-rft-v3.yaml`
+
+Checkpoints and datasets are not in the repo (size); ask me for the weights.
