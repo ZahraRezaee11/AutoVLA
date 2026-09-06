@@ -8,7 +8,7 @@ from pytorch_lightning import seed_everything
 from transformers import AutoProcessor
 from torch.utils.data import DataLoader
 import shutil
-from dataset_utils.preprocessing.nuplan_dataset import NuplanCoTAnnotationDataset, DataCollator as NuplanDataCollator
+# from dataset_utils.preprocessing.nuplan_dataset import NuplanCoTAnnotationDataset, DataCollator as NuplanDataCollator
 from dataset_utils.preprocessing.waymo_e2e_dataset import WaymoE2ECoTAnnotationDataset, DataCollator as WaymoDataCollator
 
 
@@ -108,6 +108,7 @@ if __name__ == "__main__":
     dataset_name = config.get("dataset_name", "")
 
     if dataset_name == "nuplan":
+        from dataset_utils.preprocessing.nuplan_dataset import NuplanCoTAnnotationDataset, DataCollator as NuplanDataCollator
         dataset = NuplanCoTAnnotationDataset(config, processor)
         collator = NuplanDataCollator(processor)
     elif dataset_name == "waymo":

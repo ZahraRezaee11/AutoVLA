@@ -19,3 +19,10 @@
 
 # temp
 temp/*
+# ours: heavy/local artifacts
+runs/
+dataset/
+lightning_logs/
+*.npz
+*.log
+codebook_cache/agent_vocab_valtmp.pkl
