@@ -48,27 +48,46 @@ def up4(t10):
     return np.stack([np.interp(T4, T2, w[:, d]) for d in range(2)], 1)
 
 rng = np.random.default_rng(int(os.environ.get('SEL_SEED', '0')))
-idx = rng.permutation(len(ds))[:args.limit]
-tokens, trajs, lps, rewards = [], [], [], []
+done = set()
+for prev in ['selector_data.npz', 'selector_data2.npz']:
+    if os.path.exists(prev):
+        done |= set(np.load(prev, allow_pickle=True)['tokens'].tolist())
+print(f'skipping {len(done)} already-collected scenes')
+idx = rng.permutation(len(ds))
+tokens, trajs, lps, rewards, ents, lpmins = [], [], [], [], [], []
 with torch.no_grad():
-    for count, i in enumerate(idx):
+    count = 0
+    for i in idx:
+        if count >= args.limit:
+            break
         s = ds[int(i)]
         token = os.path.basename(s['data_path']).replace('.json', '')
+        if token in done:
+            continue
+        count += 1
         prompt = (s['text'].split('<|im_start|>assistant')[0]
                   + '<|im_start|>assistant\n<answer>\nThe final output action is: ')
         inputs = processor(text=[prompt], videos=s['video_inputs'], padding=True,
                            return_tensors='pt').to('cuda')
         plen = inputs['input_ids'].shape[1]
         allowed = list(range(ASTART, ASTART + atok.n_bins))
-        cand, cand_lp = [], []
+        cand, cand_lp, cand_ent, cand_lpmin = [], [], [], []
         for k in range(args.K):
             out = vlm.generate(**inputs, max_new_tokens=10, do_sample=True,
                                temperature=1.0, top_p=0.95, output_scores=True,
                                return_dict_in_generate=True,
                                prefix_allowed_tokens_fn=lambda b, ids: allowed)
             gen = out.sequences[0, plen:][:10]
-            lp = sum(torch.log_softmax(out.scores[t][0].float(), -1)[gen[t]].item()
-                     for t in range(min(len(gen), len(out.scores))))
+            steps = min(len(gen), len(out.scores))
+            lps_t, ents_t = [], []
+            for t in range(steps):
+                logp = torch.log_softmax(out.scores[t][0].float(), -1)
+                lps_t.append(logp[gen[t]].item())
+                p = logp.exp()
+                ents_t.append(-(p * logp.nan_to_num(neginf=0.0)).sum().item())
+            lp = sum(lps_t)
+            cand_ent.append(float(np.mean(ents_t)))
+            cand_lpmin.append(float(np.min(lps_t)))
             if gen.shape[0] < 10:
                 gen = torch.cat([gen, gen[-1:].repeat(10 - gen.shape[0])])
             tr = atok.decode_token_ids_to_trajectory(gen.cpu().long())
@@ -76,10 +95,13 @@ with torch.no_grad():
         r = gt_rfs_reward(np.stack(cand), [token] * args.K)
         tokens.append(token); trajs.append(np.stack(cand))
         lps.append(cand_lp); rewards.append(r)
-        if (count + 1) % 100 == 0:
-            print(f'{count+1}/{args.limit}', flush=True)
+        ents.append(cand_ent); lpmins.append(cand_lpmin)
+        if count % 100 == 0:
+            print(f'{count}/{args.limit}', flush=True)
             np.savez(args.out, tokens=np.array(tokens), trajs=np.stack(trajs),
-                     logprobs=np.array(lps), rewards=np.stack(rewards))
+                     logprobs=np.array(lps), rewards=np.stack(rewards),
+                     entropies=np.array(ents), lp_mins=np.array(lpmins))
 np.savez(args.out, tokens=np.array(tokens), trajs=np.stack(trajs),
-         logprobs=np.array(lps), rewards=np.stack(rewards))
+         logprobs=np.array(lps), rewards=np.stack(rewards),
+         entropies=np.array(ents), lp_mins=np.array(lpmins))
 print(f'saved {len(tokens)} scenes -> {args.out}')

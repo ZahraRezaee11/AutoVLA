@@ -14,7 +14,7 @@ Everything below runs on one RTX 5090 (32 GB), Waymo data only, no CoT annotatio
 | + GRPO v2 (G=16, top-adv backward, cosine lr, scene skip-list) | 7.145 | 23.0% |
 | + GRPO v3 (longer, T=1.1) | 7.149 | 22.6% |
 | medoid-of-8 selection at inference | 7.406 | - |
-| **GBM-selector-of-8 (learned candidate selection)** | **7.483** | - |
+| **GBM-selector-of-8 (learned candidate selection, mean of 2 sampling batches)** | **7.42 ± 0.09** | - |
 | best-of-8 oracle (selection ceiling) | 8.383 | - |
 | GT-oracle (imitation ceiling, measured) | 8.175 | 9.4% |
 | Best-rater-per-frame (preference ceiling, measured) | 9.600 | - |
@@ -29,7 +29,7 @@ Everything below runs on one RTX 5090 (32 GB), Waymo data only, no CoT annotatio
 - `ours_scripts/gt_rfs_reward.py`: pseudo-RFS reward on the training split (GT trajectory as a single rater with score 10, official trust-region geometry)
 - `tools/run_rft_waymo.py`: single-GPU GRPO. Per-prompt groups (upstream normalizes across GPUs, which yields zero advantage on one GPU), G=16 rollouts with backward on top-8 |advantage|, cosine lr, degenerate-scene skip-list
 - `eval_rfs.py`, `eval_rfs_bestofk.py`: constrained-decode evaluation (generation restricted to action-token range), best-of-K oracle and selectors (logprob, medoid)
-- `make_selector_data.py` + `train_selector.py`: learned candidate selector. 4.3k training scenes x 8 rollouts scored with the pseudo-RFS reward; a gradient-boosted ranker over geometric + likelihood features (candidate centrality, group spread, lateral endpoint, initial speed) picks 1 of 8 sampled trajectories at inference. Beats medoid selection (7.483 vs 7.406); selection oracle is 8.38
+- `make_selector_data.py` + `train_selector.py`: learned candidate selector. 4.3k training scenes x 8 rollouts scored with the pseudo-RFS reward; a gradient-boosted ranker over geometric + likelihood features (candidate centrality, group spread, lateral endpoint, initial speed) picks 1 of 8 sampled trajectories at inference. Trained on 16k scenes; beats medoid selection on every sampling batch (mean 7.42 vs 7.36 across 2 independent batches of 8 rollouts); selection oracle is 8.37
 
 ## Pipeline
 

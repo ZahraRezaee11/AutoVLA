@@ -42,7 +42,7 @@ vlm = model.autovla.vlm.eval().to('cuda', dtype=torch.bfloat16)
 rated = {e['name']: e for e in pickle.load(open(f'{DATA}/rated_val.pkl', 'rb'))}
 
 names, preds2hz, n_bad = [], [], 0
-logprobs_all = []
+logprobs_all, ents_all, lpmins_all = [], [], []
 items = list(range(len(ds)))
 if args.limit: items = items[:args.limit]
 with torch.no_grad():
@@ -60,13 +60,16 @@ with torch.no_grad():
                              return_dict_in_generate=True,
                              prefix_allowed_tokens_fn=lambda b, ids: ALLOWED)
                 for _ in range(K)]
-        cand, lps = [], []
+        cand, lps, ents, lpmins = [], [], [], []
         for k in range(K):
             gen = outs[k].sequences[0, inputs['input_ids'].shape[1]:]
-            lp = 0.0
+            lps_t, ents_t = [], []
             for t in range(min(len(gen), len(outs[k].scores))):
-                lp += torch.log_softmax(outs[k].scores[t][0].float(), dim=-1)[gen[t]].item()
-            lps.append(lp)
+                logp = torch.log_softmax(outs[k].scores[t][0].float(), dim=-1)
+                lps_t.append(logp[gen[t]].item())
+                p = logp.exp()
+                ents_t.append(-(p * logp.nan_to_num(neginf=0.0)).sum().item())
+            lps.append(sum(lps_t)); ents.append(float(np.mean(ents_t))); lpmins.append(float(np.min(lps_t)))
             act = [int(t) for t in gen][:10]
             if len(act) < 10 or any(t < ASTART for t in act):
                 n_bad += 1
@@ -75,6 +78,7 @@ with torch.no_grad():
             traj = atok.decode_token_ids_to_trajectory(torch.tensor(act))
             cand.append(np.asarray(traj)[0, 1:, :2])
         names.append(token_name); preds2hz.append(np.stack(cand)); logprobs_all.append(lps)
+        ents_all.append(ents); lpmins_all.append(lpmins)
         if (len(names)) % 25 == 0: print(f'{len(names)}/{len(items)}', flush=True)
 
 preds2hz = np.stack(preds2hz)                                          # [B, K, 10, 2]
@@ -115,7 +119,8 @@ sel_lp = per_cand[np.arange(len(keep)), lp_arr.argmax(1)]
 pw = np.linalg.norm(inference[:, :, None] - inference[:, None, :], axis=-1).mean(-1)  # [B,K,K]
 sel_md = per_cand[np.arange(len(keep)), pw.sum(-1).argmin(1)]
 np.savez('eval_bestofk_results.npz', names=np.array([names[i] for i in keep]), rfs=rfs,
-         preds4hz=preds4hz[keep], logprobs=np.asarray(logprobs_all)[keep], per_cand=per_cand)
+         preds4hz=preds4hz[keep], logprobs=np.asarray(logprobs_all)[keep], per_cand=per_cand,
+         entropies=np.asarray(ents_all)[keep], lp_mins=np.asarray(lpmins_all)[keep])
 print(f'select-by-LOGPROB RFS: {sel_lp.mean():.3f}')
 print(f'select-by-MEDOID  RFS: {sel_md.mean():.3f}')
 print(f'best-of-{K} ORACLE RFS: {per_cand.max(1).mean():.3f}')
