@@ -31,6 +31,14 @@ Everything below runs on one RTX 5090 (32 GB), Waymo data only, no CoT annotatio
 - `eval_rfs.py`, `eval_rfs_bestofk.py`: constrained-decode evaluation (generation restricted to action-token range), best-of-K oracle and selectors (logprob, medoid)
 - `make_selector_data.py` + `train_selector.py`: learned candidate selector. 4.3k training scenes x 8 rollouts scored with the pseudo-RFS reward; a gradient-boosted ranker over geometric + likelihood features (candidate centrality, group spread, lateral endpoint, initial speed) picks 1 of 8 sampled trajectories at inference. Trained on 16k scenes; beats medoid selection on every sampling batch (mean 7.42 vs 7.36 across 2 independent batches of 8 rollouts); selection oracle is 8.37
 
+## Negative results (all on 478 rated val frames, all measured)
+
+- Curriculum RL on the 35% hardest training scenes (v4): no change (7.137 vs 7.149). Hard scenes are bottlenecked by the imitation reward, not by exposure.
+- Larger candidate pools (K=16): oracle rises (8.38 -> 8.61) but selector picks get worse (winner's curse with a noisy judge).
+- Trust-region search in action-token space (locked-prefix resampling around the selector's pick, inspired by TRS, Cremers et al. ECCV'26): 7.351 vs 7.350 independent sampling. Without a true reward at test time, guided search inherits the judge's errors.
+- Adding CV extrapolation to the pool, intent-consistency filtering, model-entropy features: no net gain.
+- Takeaway: every pool-side method hits the same wall; the geometric selector cannot see the scene. Next: a selector with visual features.
+
 ## Pipeline
 
 1. Extract images + build LMDB (`ours_scripts/`), generate samples (`tools/preprocessing/nocot_sample_generation.py` with `config/dataset/waymo-*-ours.yaml`)

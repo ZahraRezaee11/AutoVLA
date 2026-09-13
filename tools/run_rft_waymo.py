@@ -55,6 +55,13 @@ class WaymoGRPO(pl.LightningModule):
         ds = SFTDataset({'json_dataset_path': self.cfg['data']['train']['json_dataset_path'],
                          'sensor_data_path': None},
                         self.cfg['model'], self.processor, using_cot=False)
+        hard_path = os.environ.get('HARD_TOKENS', '')
+        if hard_path:
+            hard = set(np.load(hard_path, allow_pickle=True).tolist())
+            n0 = len(ds.scenes)
+            ds.scenes = [sc for sc in ds.scenes if sc[0].stem in hard]
+            print(f'curriculum: filtered scenes {n0} -> {len(ds.scenes)}')
+            assert len(ds.scenes) > 0, 'hard-token filter removed everything'
         self.action_tokenizer = ds.action_tokenizer
         self.n_bins = ds.action_tokenizer.n_bins
         return DataLoader(ds, batch_size=1, shuffle=True, num_workers=2,
